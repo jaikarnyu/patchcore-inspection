@@ -21,7 +21,7 @@ _DATASETS = {"mvtec": ["patchcore.datasets.mvtec", "MVTecDataset"]}
 
 @click.group(chain=True)
 @click.argument("results_path", type=str)
-@click.option("--gpu", type=int, default=[0], multiple=True, show_default=True)
+@click.option("--gpu", type=int, default=[], multiple=True, show_default=True)
 @click.option("--seed", type=int, default=0, show_default=True)
 @click.option("--log_group", type=str, default="group")
 @click.option("--log_project", type=str, default="project")
@@ -50,12 +50,12 @@ def run(
 
     list_of_dataloaders = methods["get_dataloaders"](seed)
 
-    device = patchcore.utils.set_torch_device(gpu)
+    device = patchcore.utils.set_torch_device([])
     # Device context here is specifically set and used later
     # because there was GPU memory-bleeding which I could only fix with
     # context managers.
     device_context = (
-        torch.cuda.device("cuda:{}".format(device.index))
+        torch.device("cuda:{}".format(device.index))
         if "cuda" in device.type.lower()
         else contextlib.suppress()
     )
@@ -76,7 +76,7 @@ def run(
         dataset_name = dataloaders["training"].name
 
         with device_context:
-            torch.cuda.empty_cache()
+            # torch.empty_cache()
             imagesize = dataloaders["training"].dataset.imagesize
             sampler = methods["get_sampler"](
                 device,
@@ -87,19 +87,19 @@ def run(
                     "Utilizing PatchCore Ensemble (N={}).".format(len(PatchCore_list))
                 )
             for i, PatchCore in enumerate(PatchCore_list):
-                torch.cuda.empty_cache()
+                # torch.empty_cache()
                 if PatchCore.backbone.seed is not None:
                     patchcore.utils.fix_seeds(PatchCore.backbone.seed, device)
                 LOGGER.info(
                     "Training models ({}/{})".format(i + 1, len(PatchCore_list))
                 )
-                torch.cuda.empty_cache()
+                # torch.empty_cache()
                 PatchCore.fit(dataloaders["training"])
 
-            torch.cuda.empty_cache()
+            # torch.empty_cache()
             aggregator = {"scores": [], "segmentations": []}
             for i, PatchCore in enumerate(PatchCore_list):
-                torch.cuda.empty_cache()
+                # torch.empty_cache()
                 LOGGER.info(
                     "Embedding test data with models ({}/{})".format(
                         i + 1, len(PatchCore_list)
@@ -145,6 +145,8 @@ def run(
                 ]
 
                 def image_transform(image):
+                    dataloaders["testing"].dataset.transform_std = [0.229, 0.224, 0.225]
+                    dataloaders["testing"].dataset.transform_mean = [0.485, 0.456, 0.406]
                     in_std = np.array(
                         dataloaders["testing"].dataset.transform_std
                     ).reshape(-1, 1, 1)
@@ -214,6 +216,7 @@ def run(
                 patchcore_save_path = os.path.join(
                     run_save_path, "models", dataset_name
                 )
+                LOGGER.info("Saving model to {0}".format(patchcore_save_path))
                 os.makedirs(patchcore_save_path, exist_ok=True)
                 for i, PatchCore in enumerate(PatchCore_list):
                     prepend = (
@@ -255,7 +258,7 @@ def run(
 @click.option("--patchsize_aggregate", "-pa", type=int, multiple=True, default=[])
 # NN on GPU.
 @click.option("--faiss_on_gpu", is_flag=True)
-@click.option("--faiss_num_workers", type=int, default=8)
+@click.option("--faiss_num_workers", type=int, default=1)
 def patch_core(
     backbone_names,
     layers_to_extract_from,

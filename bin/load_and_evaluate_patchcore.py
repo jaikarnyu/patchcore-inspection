@@ -34,12 +34,12 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
 
     os.makedirs(results_path, exist_ok=True)
 
-    device = patchcore.utils.set_torch_device(gpu)
+    device = patchcore.utils.set_torch_device([])
     # Device context here is specifically set and used later
     # because there was GPU memory-bleeding which I could only fix with
     # context managers.
     device_context = (
-        torch.cuda.device("cuda:{}".format(device.index))
+        torch.device("cuda:{}".format(device.index))
         if "cuda" in device.type.lower()
         else contextlib.suppress()
     )
@@ -68,13 +68,13 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
 
         with device_context:
 
-            torch.cuda.empty_cache()
+            # torch.empty_cache()
             if dataloader_count < n_patchcores:
                 PatchCore_list = next(patchcore_iter)
 
             aggregator = {"scores": [], "segmentations": []}
             for i, PatchCore in enumerate(PatchCore_list):
-                torch.cuda.empty_cache()
+                # torch.empty_cache()
                 LOGGER.info(
                     "Embedding test data with models ({}/{})".format(
                         i + 1, len(PatchCore_list)
@@ -87,6 +87,7 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
                 aggregator["segmentations"].append(segmentations)
 
             scores = np.array(aggregator["scores"])
+            LOGGER.info(scores)
             min_scores = scores.min(axis=-1).reshape(-1, 1)
             max_scores = scores.max(axis=-1).reshape(-1, 1)
             scores = (scores - min_scores) / (max_scores - min_scores)
@@ -146,6 +147,7 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
 
             LOGGER.info("Computing evaluation metrics.")
             # Compute Image-level AUROC scores for all images.
+            LOGGER.info(scores, anomaly_labels)
             auroc = patchcore.metrics.compute_imagewise_retrieval_metrics(
                 scores, anomaly_labels
             )["auroc"]
@@ -200,7 +202,7 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
 @click.option("--patch_core_paths", "-p", type=str, multiple=True, default=[])
 # NN on GPU.
 @click.option("--faiss_on_gpu", is_flag=True)
-@click.option("--faiss_num_workers", type=int, default=8)
+@click.option("--faiss_num_workers", type=int, default=1)
 def patch_core_loader(patch_core_paths, faiss_on_gpu, faiss_num_workers):
     def get_patchcore_iter(device):
         for patch_core_path in patch_core_paths:

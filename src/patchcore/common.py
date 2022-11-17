@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 
 class FaissNN(object):
-    def __init__(self, on_gpu: bool = False, num_workers: int = 4) -> None:
+    def __init__(self, on_gpu: bool = False, num_workers: int = 1) -> None:
         """FAISS Nearest neighbourhood search.
 
         Args:
@@ -20,7 +20,7 @@ class FaissNN(object):
             num_workers: Number of workers to use with FAISS for similarity search.
         """
         faiss.omp_set_num_threads(num_workers)
-        self.on_gpu = on_gpu
+        self.on_gpu = False
         self.search_index = None
 
     def _gpu_cloner_options(self):

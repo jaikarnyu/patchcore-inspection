@@ -194,6 +194,7 @@ class PatchCore(torch.nn.Module):
                     labels_gt.extend(image["is_anomaly"].numpy().tolist())
                     masks_gt.extend(image["mask"].numpy().tolist())
                     image = image["image"]
+                    LOGGER.info("0")
                 _scores, _masks = self._predict(image)
                 for score, mask in zip(_scores, _masks):
                     scores.append(score)
@@ -209,7 +210,6 @@ class PatchCore(torch.nn.Module):
         with torch.no_grad():
             features, patch_shapes = self._embed(images, provide_patch_shapes=True)
             features = np.asarray(features)
-
             patch_scores = image_scores = self.anomaly_scorer.predict([features])[0]
             image_scores = self.patch_maker.unpatch_scores(
                 image_scores, batchsize=batchsize
@@ -222,8 +222,8 @@ class PatchCore(torch.nn.Module):
             )
             scales = patch_shapes[0]
             patch_scores = patch_scores.reshape(batchsize, scales[0], scales[1])
-
             masks = self.anomaly_segmentor.convert_to_segmentation(patch_scores)
+            # masks = []
 
         return [score for score in image_scores], [mask for mask in masks]
 
